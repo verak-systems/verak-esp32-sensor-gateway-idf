@@ -12,5 +12,7 @@
     "--background-index",
     "--query-driver=**",
     "--compile-commands-dir=c:\\Users\\ITA\\sample_project\\build"
-  ]
+  ],
+  "idf.flashType": "UART",
+  "idf.portWin": "COM3"
 }

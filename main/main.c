@@ -2,10 +2,17 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_netif.h"
+#include "nvs_flash.h"
 #include "sdkconfig.h"
 #include "driver/gpio.h"
 #include "onewire_bus.h"
 #include "ds18b20.h"
+#include "mqtt5_client.h"
+#include "Secrets.h"
+
 
 // Define if using internal pulup or not
 #if CONFIG_EXAMPLE_ONEWIRE_ENABLE_INTERNAL_PULLUP
@@ -23,10 +30,27 @@
 #define ONEWIRE_BUS_GPIO    CONFIG_EXAMPLE_ONEWIRE_BUS_GPIO
 #define ONEWIRE_MAX_DS18B20 CONFIG_EXAMPLE_ONEWIRE_MAX_DS18B20
 
-static const char *TAG = "Onewire";
+static const char *TAG = "Verak";
+
+static void wifi_event_handler(void* args, esp_event_base_t event_base, int32_t event_id, void* event_data){
+    if(event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START){
+        esp_wifi_connect();
+    }else if(event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED){
+        ESP_LOGD(TAG, "Disconnected, retyring...\n");
+    }else if(event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP){
+        ESP_LOGI(TAG, "Connected!\n");
+    }
+}
 
 void app_main(void)
 {
+    nvs_flash_init();
+    esp_netif_init();
+    esp_event_loop_create_default();
+    esp_netif_create_default_wifi_sta();
+    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL);
+    esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, NULL);
+
     // initialize bus and set config values
     onewire_bus_handle_t bus = NULL;
     onewire_bus_config_t bus_config = {
@@ -37,6 +61,21 @@ void app_main(void)
             .en_pull_up = ONEWIRE_ENABLE_INTERNAL_PULLUP
         }
     };
+
+    wifi_init_config_t wifi_config = WIFI_INIT_CONFIG_DEFAULT();
+    esp_wifi_init(&wifi_config);
+
+    wifi_config_t wifi_config_sta = {
+        .sta = {
+            .ssid = SSID,
+            .password = PASS
+        }
+    };
+
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    esp_wifi_set_config(WIFI_IF_STA, &wifi_config_sta);
+
+    esp_wifi_start();
 
 // Define and configure backend to decide how timing is generated
 #if CONFIG_EXAMPLE_ONEWIRE_BACKEND_RMT
@@ -59,6 +98,7 @@ void app_main(void)
 #else
 #error "No 1 wire backend selected in menu config"
 #endif
+
     // Initalize starting device number
     int ds18b20_device_num = 0;
     // Inizialize array of ds18b20 devices with length of ONEWIRE_MAX_DS18B20 set in the config
@@ -123,7 +163,7 @@ void app_main(void)
         // for each sensor, get the timeperature and log it
         for (int i = 0; i < ds18b20_device_num; i++){
             ESP_ERROR_CHECK(ds18b20_get_temperature(ds18b20s[i], &temperature));
-            ESP_LOGI(TAG, "temperature read from DS18B20[%d]: %.2fC", i, temperature);
+            ESP_LOGI(TAG, "temperature read from DS18B20[%d]: %.2f°C", i, temperature);
         }
     }
 }

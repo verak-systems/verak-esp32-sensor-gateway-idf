@@ -10,6 +10,16 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 0.3.1
+  espressif/mqtt:
+    component_hash: ffdad5659706b4dc14bc63f8eb73ef765efa015bf7e9adf71c813d52a2dc9342
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.0
   espressif/onewire_bus:
     component_hash: d709015ba466095259228521cf1bad9c0cdaaa42a92ea5d9c88ec6c28ae89e9b
     dependencies:
@@ -26,8 +36,9 @@ dependencies:
     version: 6.0.0
 direct_dependencies:
 - espressif/ds18b20
+- espressif/mqtt
 - espressif/onewire_bus
 - idf
-manifest_hash: 246b7df714731ed12537884ccfb6d429bdaf29b7cfa73b80dc3ebc51598319f6
+manifest_hash: a2f3640e00a7006639dd7ff1961bbe47962995d06b3bb96a18bc6f2bdc640255
 target: esp32c6
 version: 3.0.0
