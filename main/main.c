@@ -10,8 +10,9 @@
 #include "driver/gpio.h"
 #include "onewire_bus.h"
 #include "ds18b20.h"
-#include "mqtt5_client.h"
+#include "mqtt_client.h"
 #include "Secrets.h"
+
 
 
 // Define if using internal pulup or not
@@ -41,6 +42,55 @@ static void wifi_event_handler(void* args, esp_event_base_t event_base, int32_t 
         ESP_LOGI(TAG, "Connected!\n");
     }
 }
+
+const esp_mqtt_client_config_t mqtt_cfg = {
+    .broker.address.uri = "",
+    .credentials = {
+        .client_id = "ESP32",
+        .username = MQTT_USER,
+        .authentication = {
+            .password = MQTT_PASS
+        }
+    },
+
+};
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data){
+    esp_mqtt_event_handle_t event = event_data;
+    esp_mqtt_client_handle_t client = event->client;
+
+    int msg_id = -1;
+
+    switch ((esp_mqtt_event_id_t)event_id){
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG, "Connected to MQTT broker");
+
+        msg_id = esp_mqtt_client_subscribe_single(client, "", 0);
+        ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+
+        msg_id = esp_mqtt_client_subscribe_single(client, "", 0);
+        ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+
+        break;
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG, "CLIENT DISCONNECTED, msg_id=%d", msg_id);
+        ESP_ERROR_CHECK(esp_mqtt_client_reconnect(client));
+
+        break;
+    case MQTT_EVENT_DATA:
+        ESP_LOGI(TAG, "MQTT EVENT DATA");
+        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+        printf("DATA=%.*s\r\n", event->data_len, event->data);
+
+        break;
+    default:
+        ESP_LOGI(TAG, "Other event id:%d", event->event_id);
+
+        break;
+    }
+}
+
+// static void mqtt_start
 
 void app_main(void)
 {
@@ -76,6 +126,13 @@ void app_main(void)
     esp_wifi_set_config(WIFI_IF_STA, &wifi_config_sta);
 
     esp_wifi_start();
+
+    esp_mqtt_client_handle_t mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+
+    ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client));
+
+    esp_mqtt_client_register_event(mqtt_client, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
+    esp_mqtt_client_start(mqtt_client);
 
 // Define and configure backend to decide how timing is generated
 #if CONFIG_EXAMPLE_ONEWIRE_BACKEND_RMT
@@ -166,4 +223,12 @@ void app_main(void)
             ESP_LOGI(TAG, "temperature read from DS18B20[%d]: %.2f°C", i, temperature);
         }
     }
+
+    //  String/float formatting
+    int len = snprintf(NULL, 0, "%f°C", temperature);
+    char *temp_s = malloc(len + 1);
+    snprintf(temp_s, len + 1, "%f°C", temperature);
+
+    // Usage for publishing
+    esp_mqtt_client_publish(mqtt_client, "", temp_s, 0, 1, 1);
 }
