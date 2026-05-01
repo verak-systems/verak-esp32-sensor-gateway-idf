@@ -221,14 +221,18 @@ void app_main(void)
         for (int i = 0; i < ds18b20_device_num; i++){
             ESP_ERROR_CHECK(ds18b20_get_temperature(ds18b20s[i], &temperature));
             ESP_LOGI(TAG, "temperature read from DS18B20[%d]: %.2f°C", i, temperature);
+
+            //  String/float formatting
+            
+            int len = snprintf(NULL, 0, "%f°C", temperature);
+            char *temp_s = malloc(len + 1);
+            snprintf(temp_s, len + 1, "%f°C", temperature);
+
+            char data[64];
+            snprintf(data, sizeof(data), "{\"temp\": \"%s\"}", temp_s);
+
+            // Usage for publishing
+            esp_mqtt_client_publish(mqtt_client, "", temp_s, 0, 1, 1);
         }
     }
-
-    //  String/float formatting
-    int len = snprintf(NULL, 0, "%f°C", temperature);
-    char *temp_s = malloc(len + 1);
-    snprintf(temp_s, len + 1, "%f°C", temperature);
-
-    // Usage for publishing
-    esp_mqtt_client_publish(mqtt_client, "", temp_s, 0, 1, 1);
 }
